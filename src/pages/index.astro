@@ -1,0 +1,24 @@
+---
+import Layout from '../layouts/Layout.astro';
+import App from '../components/App';
+---
+
+<Layout title="Bons de Livraison — Shopify Dashboard">
+  <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">DECOSHOP</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Gestion des bons de livraison</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-400">
+          Connecté
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    <App client:load />
+  </main>
+</Layout>
