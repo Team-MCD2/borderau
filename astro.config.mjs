@@ -20,5 +20,6 @@ export default defineConfig({
   // Port de dev personnalisé
   server: {
     port: 4321,
+    host: true, // Autoriser l'accès depuis le réseau local
   },
 });

@@ -263,12 +263,12 @@ export default function AdminDeliveryNotes() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Changer statut et assigner un livreur</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (numéro, client, email)"
-            className="w-full sm:w-72 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            className="w-full sm:flex-1 sm:min-w-[200px] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
           />
           <select
             value={status}
@@ -343,11 +343,11 @@ export default function AdminDeliveryNotes() {
                 />
               </th>
               <th className="py-2 pr-4">BL</th>
-              <th className="py-2 pr-4">Client</th>
-              <th className="py-2 pr-4">Montant</th>
+              <th className="py-2 pr-4 hidden sm:table-cell">Client</th>
+              <th className="py-2 pr-4 hidden md:table-cell">Montant</th>
               <th className="py-2 pr-4">Statut</th>
               <th className="py-2 pr-4">Livreur</th>
-              <th className="py-2 pr-4">Items</th>
+              <th className="py-2 pr-4 hidden sm:table-cell">Items</th>
               <th className="py-2 pr-4">Actions</th>
             </tr>
           </thead>
@@ -376,11 +376,11 @@ export default function AdminDeliveryNotes() {
                     />
                   </td>
                   <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{n.numero_bl}</td>
-                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
+                  <td className="py-2 pr-4 hidden sm:table-cell text-gray-700 dark:text-gray-300">
                     {(n.client_prenom ? `${n.client_prenom} ` : '') + (n.client_nom ?? '')}
                     <div className="text-xs text-gray-500 dark:text-gray-400">{n.client_email ?? ''}</div>
                   </td>
-                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{Number(n.montant_total_ttc ?? 0).toFixed(2)} €</td>
+                  <td className="py-2 pr-4 hidden md:table-cell text-gray-700 dark:text-gray-300 whitespace-nowrap">{Number(n.montant_total_ttc ?? 0).toFixed(2)} €</td>
                   <td className="py-2 pr-4">
                     <select
                       value={(n.statut as any) || 'cree'}
@@ -406,7 +406,7 @@ export default function AdminDeliveryNotes() {
                       ))}
                     </select>
                   </td>
-                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{n.items?.length ?? 0}</td>
+                  <td className="py-2 pr-4 hidden sm:table-cell text-gray-700 dark:text-gray-300 whitespace-nowrap">{n.items?.length ?? 0}</td>
                   <td className="py-2 pr-4 whitespace-nowrap">
                     <button
                       onClick={() => handlePrint(n)}

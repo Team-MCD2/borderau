@@ -523,7 +523,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Admin tabs */}
       {(userRole === 'admin' || userRole === 'vendeur_proprietaire') && (
-        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
           <button
             onClick={() => setAdminView('orders')}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
@@ -790,11 +790,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   />
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-blue-600" onClick={() => toggleSort('name')}>Commande<SortIcon column="name" /></th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Client</th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-blue-600" onClick={() => toggleSort('date')}>Date<SortIcon column="date" /></th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-blue-600" onClick={() => toggleSort('amount')}>Montant<SortIcon column="amount" /></th>
+                <th className="hidden sm:table-cell px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Client</th>
+                <th className="hidden md:table-cell px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-blue-600" onClick={() => toggleSort('date')}>Date<SortIcon column="date" /></th>
+                <th className="hidden sm:table-cell px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-blue-600" onClick={() => toggleSort('amount')}>Montant<SortIcon column="amount" /></th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-blue-600" onClick={() => toggleSort('status')}>Statut<SortIcon column="status" /></th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Tracking</th>
+                <th className="hidden lg:table-cell px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Tracking</th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Actions</th>
               </tr>
             </thead>
@@ -834,7 +834,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                       <span className="font-semibold text-gray-900 dark:text-gray-100">{order.name}</span>
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="hidden sm:table-cell px-4 py-3">
                       <div>
                         <p className="font-medium text-gray-800 dark:text-gray-200">
                           {order.customer
@@ -845,7 +845,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    <td className="hidden md:table-cell px-4 py-3 text-gray-500 dark:text-gray-400">
                       {new Date(order.created_at).toLocaleDateString('fr-FR', {
                         day: '2-digit',
                         month: 'short',
@@ -853,7 +853,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                       })}
                     </td>
 
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
+                    <td className="hidden sm:table-cell px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
                       {Number(order.total_price).toLocaleString('fr-FR', {
                         style: 'currency',
                         currency: order.currency || 'EUR',
@@ -862,7 +862,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
                     <td className="px-4 py-3">{statusBadge(order.fulfillment_status)}</td>
 
-                    <td className="px-4 py-3">
+                    <td className="hidden lg:table-cell px-4 py-3">
                       {order.fulfillments.length > 0 ? (
                         <div className="space-y-1">
                           {order.fulfillments.map((f) => (

@@ -170,12 +170,12 @@ export default function AdminInventory() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Gérer les articles et catégories</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (description, marque, modèle, numéro)"
-            className="w-full sm:w-80 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            className="w-full sm:flex-1 sm:min-w-[200px] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
           />
           <select
             value={categorieId}
@@ -215,9 +215,9 @@ export default function AdminInventory() {
             <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <th className="py-2 pr-4">Numéro</th>
               <th className="py-2 pr-4">Description</th>
-              <th className="py-2 pr-4">Catégorie</th>
+              <th className="py-2 pr-4 hidden sm:table-cell">Catégorie</th>
               <th className="py-2 pr-4">Stock</th>
-              <th className="py-2 pr-4">Prix vente</th>
+              <th className="py-2 pr-4 hidden sm:table-cell">Prix vente</th>
               <th className="py-2 pr-4">Actions</th>
             </tr>
           </thead>
@@ -231,9 +231,9 @@ export default function AdminInventory() {
                 <tr key={a.id} className="border-b border-gray-100 dark:border-gray-700/60">
                   <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{a.numero_article}</td>
                   <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{a.description}</td>
-                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{a.categorie_nom ?? ''}</td>
+                  <td className="py-2 pr-4 hidden sm:table-cell text-gray-700 dark:text-gray-300 whitespace-nowrap">{a.categorie_nom ?? ''}</td>
                   <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{a.quantite ?? 0}</td>
-                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{Number(a.prix_vente ?? 0).toFixed(2)} €</td>
+                  <td className="py-2 pr-4 hidden sm:table-cell text-gray-700 dark:text-gray-300 whitespace-nowrap">{Number(a.prix_vente ?? 0).toFixed(2)} €</td>
                   <td className="py-2 pr-4 whitespace-nowrap">
                     <div className="flex gap-2">
                       <button

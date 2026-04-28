@@ -112,12 +112,12 @@ export default function AdminUsers() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Gérer les utilisateurs et leurs rôles</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher (nom, email)"
-            className="w-full sm:w-80 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            className="w-full sm:flex-1 sm:min-w-[200px] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
           />
           <button
             onClick={() => setCreateOpen(true)}
@@ -140,8 +140,8 @@ export default function AdminUsers() {
           <thead>
             <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <th className="py-2 pr-4">Nom</th>
-              <th className="py-2 pr-4">Email</th>
-              <th className="py-2 pr-4">Téléphone</th>
+              <th className="py-2 pr-4 hidden sm:table-cell">Email</th>
+              <th className="py-2 pr-4 hidden md:table-cell">Téléphone</th>
               <th className="py-2 pr-4">Rôle</th>
               <th className="py-2 pr-4">Statut</th>
               <th className="py-2 pr-4">Actions</th>
@@ -167,8 +167,8 @@ export default function AdminUsers() {
                     <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
                       {u.prenom} {u.nom}
                     </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{u.email}</td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{u.telephone}</td>
+                    <td className="py-2 pr-4 hidden sm:table-cell text-gray-700 dark:text-gray-300">{u.email}</td>
+                    <td className="py-2 pr-4 hidden md:table-cell text-gray-700 dark:text-gray-300 whitespace-nowrap">{u.telephone}</td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 whitespace-nowrap capitalize">{u.role}</td>
                     <td className="py-2 pr-4 whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
