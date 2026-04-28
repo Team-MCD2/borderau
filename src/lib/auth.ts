@@ -3,7 +3,7 @@
 // ============================================================
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getDb } from './db';
+import { dbAll, dbGet, dbRun } from './db';
 
 const JWT_SECRET = import.meta.env.JWT_SECRET || 'decoshop-dev-secret-change-me';
 const JWT_EXPIRES_IN = '24h';
@@ -79,19 +79,16 @@ export function toSafeUser(user: UserRow): SafeUser {
 
 // --------------- DB Queries ---------------
 
-export function findUserByEmail(email: string): UserRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM profiles WHERE email = ? AND active = 1').get(email) as UserRow | undefined;
+export async function findUserByEmail(email: string): Promise<UserRow | undefined> {
+  return dbGet<UserRow>('SELECT * FROM profiles WHERE email = ? AND active = 1', [email]);
 }
 
-export function findUserById(id: number): UserRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM profiles WHERE id = ? AND active = 1').get(id) as UserRow | undefined;
+export async function findUserById(id: number): Promise<UserRow | undefined> {
+  return dbGet<UserRow>('SELECT * FROM profiles WHERE id = ? AND active = 1', [id]);
 }
 
-export function getAllUsers(): SafeUser[] {
-  const db = getDb();
-  const rows = db.prepare('SELECT * FROM profiles ORDER BY created_at DESC').all() as UserRow[];
+export async function getAllUsers(): Promise<SafeUser[]> {
+  const rows = await dbAll<UserRow>('SELECT * FROM profiles ORDER BY created_at DESC');
   return rows.map(toSafeUser);
 }
 
@@ -102,14 +99,17 @@ export async function createUser(
   lastName: string,
   role: string,
 ): Promise<SafeUser> {
-  const db = getDb();
   const hash = await hashPassword(password);
-  const result = db.prepare(
+  const result = await dbRun(
     `INSERT INTO profiles (email, password_hash, nom, prenom, role)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(email, hash, lastName, firstName, role);
+     VALUES (?, ?, ?, ?, ?)`,
+    [email, hash, lastName, firstName, role],
+  );
 
-  const user = db.prepare('SELECT * FROM profiles WHERE id = ?').get(result.lastInsertRowid) as UserRow;
+  const user = await dbGet<UserRow>('SELECT * FROM profiles WHERE id = ?', [result.lastInsertRowid]);
+  if (!user) {
+    throw new Error('Utilisateur créé mais introuvable');
+  }
   return toSafeUser(user);
 }
 

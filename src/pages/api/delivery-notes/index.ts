@@ -4,7 +4,7 @@
 // OPTIONS /api/delivery-notes      — Preflight CORS
 // ============================================================
 import type { APIRoute } from 'astro';
-import { getDb, generateBlNumber } from '../../../lib/db';
+import { dbAll, dbGet, dbRun, generateBlNumberAsync } from '../../../lib/db';
 import { authenticateRequest } from '../../../lib/auth';
 import {
   jsonOk,
@@ -19,8 +19,6 @@ export const OPTIONS: APIRoute = () => corsPreflightResponse();
 export const GET: APIRoute = async ({ request, url }) => {
   const auth = authenticateRequest(request);
   if (!auth) return jsonError('Non authentifié', 401);
-
-  const db = getDb();
 
   const statut = url.searchParams.get('statut');
   const livreurId = url.searchParams.get('livreur_id');
@@ -53,12 +51,13 @@ export const GET: APIRoute = async ({ request, url }) => {
     params.push(s, s, s);
   }
 
-  const countRow = db.prepare(
-    `SELECT COUNT(*) as total FROM bons_livraison bl LEFT JOIN clients c ON c.id = bl.client_id ${where}`
-  ).get(...params) as { total: number };
+  const countRow = await dbGet<{ total: number }>(
+    `SELECT COUNT(*) as total FROM bons_livraison bl LEFT JOIN clients c ON c.id = bl.client_id ${where}`,
+    params,
+  );
 
   params.push(limit, offset);
-  const rows = db.prepare(
+  const rows = await dbAll<Record<string, any>>(
     `SELECT bl.*,
             c.nom AS client_nom, c.prenom AS client_prenom,
             c.email AS client_email, c.telephone AS client_telephone, c.adresse AS client_adresse,
@@ -71,18 +70,15 @@ export const GET: APIRoute = async ({ request, url }) => {
      ${where}
      ORDER BY bl.date_creation DESC
      LIMIT ? OFFSET ?`
-  ).all(...params);
+  , params);
 
-  // Fetch items for each BL
-  const stmtItems = db.prepare(
-    'SELECT * FROM lignes_bl WHERE bl_id = ?'
-  );
-  const notes = rows.map((row: any) => ({
-    ...row,
-    items: stmtItems.all(row.id),
-  }));
+  const notes = [] as any[];
+  for (const row of rows) {
+    const items = await dbAll('SELECT * FROM lignes_bl WHERE bl_id = ?', [row.id]);
+    notes.push({ ...row, items });
+  }
 
-  return jsonOk({ delivery_notes: notes, total: countRow.total, limit, offset });
+  return jsonOk({ delivery_notes: notes, total: countRow?.total ?? 0, limit, offset });
 };
 
 // --------------- POST /api/delivery-notes ---------------
@@ -126,38 +122,37 @@ export const POST: APIRoute = async ({ request }) => {
     return jsonError('Au moins un article (items[]) requis', 400);
   }
 
-  const db = getDb();
-
   // Créer ou trouver le client
   let clientId: number;
   const existingClient = body.client_email
-    ? db.prepare('SELECT id FROM clients WHERE email = ?').get(body.client_email) as { id: number } | undefined
+    ? await dbGet<{ id: number }>('SELECT id FROM clients WHERE email = ?', [body.client_email])
     : undefined;
 
   if (existingClient) {
     clientId = existingClient.id;
   } else {
-    const clientResult = db.prepare(
-      'INSERT INTO clients (nom, prenom, email, telephone, adresse) VALUES (?, ?, ?, ?, ?)'
-    ).run(
-      body.client_nom,
-      body.client_prenom ?? '',
-      body.client_email ?? '',
-      body.client_telephone ?? '',
-      body.client_adresse ?? '',
+    const clientResult = await dbRun(
+      'INSERT INTO clients (nom, prenom, email, telephone, adresse) VALUES (?, ?, ?, ?, ?)',
+      [
+        body.client_nom,
+        body.client_prenom ?? '',
+        body.client_email ?? '',
+        body.client_telephone ?? '',
+        body.client_adresse ?? '',
+      ],
     );
     clientId = Number(clientResult.lastInsertRowid);
   }
 
-  const blNumber = generateBlNumber(db);
+  const blNumber = await generateBlNumberAsync();
   const totalTtc = body.items.reduce((sum, it) => sum + it.quantite * it.prix_unitaire, 0);
 
-  const result = db.prepare(`
+  const result = await dbRun(`
     INSERT INTO bons_livraison
       (numero_bl, commande_id, vendeur_id, livreur_id, client_id,
        statut, mode_livraison, montant_total_ttc)
     VALUES (?, ?, ?, ?, ?, 'cree', ?, ?)
-  `).run(
+  `, [
     blNumber,
     body.commande_id ?? null,
     auth.userId,
@@ -165,26 +160,22 @@ export const POST: APIRoute = async ({ request }) => {
     clientId,
     body.mode_livraison ?? 'domicile',
     totalTtc,
-  );
+  ]);
 
   const noteId = result.lastInsertRowid;
 
   // Insert lignes
-  const stmtItem = db.prepare(`
-    INSERT INTO lignes_bl (bl_id, article_id, designation, quantite, prix_unitaire)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  const insertItems = db.transaction(() => {
-    for (const it of body.items) {
-      stmtItem.run(noteId, it.article_id ?? null, it.designation, it.quantite, it.prix_unitaire);
-    }
-  });
-  insertItems();
+  for (const it of body.items) {
+    await dbRun(
+      `INSERT INTO lignes_bl (bl_id, article_id, designation, quantite, prix_unitaire)
+       VALUES (?, ?, ?, ?, ?)`,
+      [noteId, it.article_id ?? null, it.designation, it.quantite, it.prix_unitaire],
+    );
+  }
 
   // Return created BL
-  const note = db.prepare('SELECT * FROM bons_livraison WHERE id = ?').get(noteId) as Record<string, unknown>;
-  const items = db.prepare('SELECT * FROM lignes_bl WHERE bl_id = ?').all(noteId);
+  const note = await dbGet<Record<string, unknown>>('SELECT * FROM bons_livraison WHERE id = ?', [noteId]);
+  const items = await dbAll('SELECT * FROM lignes_bl WHERE bl_id = ?', [noteId]);
 
   return jsonOk({ delivery_note: { ...note, items } }, 201);
 };

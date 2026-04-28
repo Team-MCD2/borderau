@@ -5,7 +5,7 @@
 // OPTIONS /api/articles/[id] — Preflight CORS
 // ============================================================
 import type { APIRoute } from 'astro';
-import { getDb } from '../../../lib/db';
+import { dbGet, dbRun } from '../../../lib/db';
 import { authenticateRequest } from '../../../lib/auth';
 import {
   jsonOk,
@@ -25,13 +25,13 @@ export const GET: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   if (!id || isNaN(id)) return jsonError('ID invalide', 400);
 
-  const db = getDb();
-  const article = db.prepare(
+  const article = await dbGet(
     `SELECT a.*, c.nom AS categorie_nom
      FROM articles a
      LEFT JOIN categories c ON c.id = a.categorie_id
-     WHERE a.id = ?`
-  ).get(id);
+     WHERE a.id = ?`,
+    [id],
+  );
 
   if (!article) return jsonError('Article introuvable', 404);
   return jsonOk({ article });
@@ -46,8 +46,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   if (!id || isNaN(id)) return jsonError('ID invalide', 400);
 
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM articles WHERE id = ?').get(id);
+  const existing = await dbGet('SELECT id FROM articles WHERE id = ?', [id]);
   if (!existing) return jsonError('Article introuvable', 404);
 
   const parsed = await safeJsonParse<Record<string, unknown>>(request);
@@ -75,14 +74,15 @@ export const PUT: APIRoute = async ({ params, request }) => {
 
   values.push(id);
 
-  db.prepare(`UPDATE articles SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  await dbRun(`UPDATE articles SET ${fields.join(', ')} WHERE id = ?`, values as any[]);
 
-  const article = db.prepare(
+  const article = await dbGet(
     `SELECT a.*, c.nom AS categorie_nom
      FROM articles a
      LEFT JOIN categories c ON c.id = a.categorie_id
-     WHERE a.id = ?`
-  ).get(id);
+     WHERE a.id = ?`,
+    [id],
+  );
 
   return jsonOk({ article });
 };
@@ -99,10 +99,9 @@ export const DELETE: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   if (!id || isNaN(id)) return jsonError('ID invalide', 400);
 
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM articles WHERE id = ?').get(id);
+  const existing = await dbGet('SELECT id FROM articles WHERE id = ?', [id]);
   if (!existing) return jsonError('Article introuvable', 404);
 
-  db.prepare('DELETE FROM articles WHERE id = ?').run(id);
+  await dbRun('DELETE FROM articles WHERE id = ?', [id]);
   return jsonOk({ deleted: true, id });
 };

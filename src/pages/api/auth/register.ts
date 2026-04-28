@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
     return jsonError(`Rôle invalide. Valeurs possibles : ${VALID_ROLES.join(', ')}`, 400);
   }
 
-  const existing = findUserByEmail(email);
+  const existing = await findUserByEmail(email);
   if (existing) {
     return jsonError('Un utilisateur avec cet email existe déjà', 409);
   }

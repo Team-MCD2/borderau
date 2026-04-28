@@ -11,6 +11,10 @@ import OrderDetailPanel from './OrderDetailPanel';
 import DeliveryNotePrint from './DeliveryNotePrint';
 import Analytics from './Analytics';
 import ApiLog from './ApiLog';
+import AdminDeliveryNotes from './AdminDeliveryNotes';
+import AdminInventory from './AdminInventory';
+import AdminClients from './AdminClients';
+import AdminUsers from './AdminUsers';
 
 type AutoRefresh = 0 | 30 | 60 | 300;
 
@@ -27,6 +31,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { addToast } = useToast();
   const { theme, toggle: toggleTheme } = useTheme();
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const [userRole, setUserRole] = useState<string>('');
 
   const [orders, setOrders] = useState<ShopifyOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +57,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  // Admin view
+  const [adminView, setAdminView] = useState<'orders' | 'bl' | 'inventory' | 'clients' | 'users'>('orders');
+
   // Panels & modals
   const [detailOrder, setDetailOrder] = useState<ShopifyOrder | null>(null);
   const [createModal, setCreateModal] = useState<ShopifyOrder | null>(null);
@@ -59,6 +68,18 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   const addLog = useCallback((log: ApiLogEntry) => {
     setLogs((prev) => [log, ...prev].slice(0, 50));
+  }, []);
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem('decoshop_user');
+    if (rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        setUserRole(u?.role || '');
+      } catch {
+        setUserRole('');
+      }
+    }
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -500,6 +521,73 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       {/* Analytics */}
       <Analytics orders={orders} />
 
+      {/* Admin tabs */}
+      {(userRole === 'admin' || userRole === 'vendeur_proprietaire') && (
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+          <button
+            onClick={() => setAdminView('orders')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              adminView === 'orders'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Commandes
+          </button>
+          <button
+            onClick={() => setAdminView('bl')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              adminView === 'bl'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Admin BL
+          </button>
+          <button
+            onClick={() => setAdminView('inventory')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              adminView === 'inventory'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Inventaire
+          </button>
+          <button
+            onClick={() => setAdminView('clients')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              adminView === 'clients'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Clients
+          </button>
+          <button
+            onClick={() => setAdminView('users')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              adminView === 'users'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Utilisateurs
+          </button>
+        </div>
+      )}
+
+      {/* View content */}
+      {adminView === 'bl' ? (
+        <AdminDeliveryNotes />
+      ) : adminView === 'inventory' ? (
+        <AdminInventory />
+      ) : adminView === 'clients' ? (
+        <AdminClients />
+      ) : adminView === 'users' ? (
+        <AdminUsers />
+      ) : (
+        <>
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
@@ -965,6 +1053,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* API log */}
       <ApiLog logs={logs} />
+        </>
+      )}
     </div>
   );
 }

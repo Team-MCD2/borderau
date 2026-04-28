@@ -23,7 +23,7 @@ export const POST: APIRoute = async ({ request }) => {
     return jsonError('Email et mot de passe requis', 400);
   }
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
   if (!user) {
     return jsonError('Email ou mot de passe incorrect', 401);
   }

@@ -13,8 +13,30 @@ export default function App() {
 
   // Verify token on mount
   useEffect(() => {
+    const badge = document.getElementById('auth-badge');
+    const updateBadge = () => {
+      if (!badge) return;
+      const rawUser = localStorage.getItem('decoshop_user');
+      const token = localStorage.getItem('decoshop_token');
+      if (!token) {
+        badge.textContent = 'Déconnecté';
+        badge.className = 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-900/30 px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400';
+        return;
+      }
+      let label = 'Connecté';
+      try {
+        const u = rawUser ? JSON.parse(rawUser) : null;
+        if (u?.email) label = u.email;
+      } catch {
+        // ignore
+      }
+      badge.textContent = label;
+      badge.className = 'inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-400';
+    };
+
     const token = localStorage.getItem('decoshop_token');
     if (!token) {
+      updateBadge();
       setChecking(false);
       return;
     }
@@ -32,13 +54,22 @@ export default function App() {
       .catch(() => {
         // Offline — keep token, trust local state
       })
-      .finally(() => setChecking(false));
+      .finally(() => {
+        updateBadge();
+        setChecking(false);
+      });
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('decoshop_token');
     localStorage.removeItem('decoshop_user');
     setAuthed(false);
+
+    const badge = document.getElementById('auth-badge');
+    if (badge) {
+      badge.textContent = 'Déconnecté';
+      badge.className = 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-900/30 px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400';
+    }
   };
 
   if (checking) {

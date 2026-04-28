@@ -2,6 +2,7 @@
 // src/lib/db.ts — SQLite database (better-sqlite3)
 // ============================================================
 import Database from 'better-sqlite3';
+import { createClient, type Client } from '@libsql/client';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -10,9 +11,16 @@ import bcrypt from 'bcryptjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '..', '..', 'data', 'decoshop.db');
 
+function useTurso(): boolean {
+  return Boolean(import.meta.env.TURSO_DATABASE_URL) && Boolean(import.meta.env.TURSO_AUTH_TOKEN);
+}
+
 // --------------- Singleton ---------------
 
 let _db: Database.Database | null = null;
+
+let _turso: Client | null = null;
+let _tursoReady: Promise<void> | null = null;
 
 export function getDb(): Database.Database {
   if (!_db) {
@@ -25,6 +33,92 @@ export function getDb(): Database.Database {
     initSchema(_db);
   }
   return _db;
+}
+
+async function getTursoClient(): Promise<Client> {
+  if (_turso) return _turso;
+
+  const url = import.meta.env.TURSO_DATABASE_URL;
+  const authToken = import.meta.env.TURSO_AUTH_TOKEN;
+
+  if (!url || !authToken) {
+    throw new Error('TURSO_DATABASE_URL / TURSO_AUTH_TOKEN manquants');
+  }
+
+  _turso = createClient({ url, authToken });
+
+  if (!_tursoReady) {
+    _tursoReady = initSchemaTurso(_turso);
+  }
+  await _tursoReady;
+  return _turso;
+}
+
+function splitSqlStatements(sql: string): string[] {
+  // Minimal splitter for this schema (no triggers/procs) — remove line comments, split on ';'
+  const withoutLineComments = sql
+    .split('\n')
+    .map((line) => line.replace(/--.*$/g, ''))
+    .join('\n');
+
+  return withoutLineComments
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+type SqlArgs = any[];
+
+export async function dbExec(sql: string): Promise<void> {
+  if (useTurso()) {
+    const client = await getTursoClient();
+    const statements = splitSqlStatements(sql);
+    for (const st of statements) {
+      await client.execute(st);
+    }
+    return;
+  }
+
+  const db = getDb();
+  db.exec(sql);
+}
+
+export async function dbGet<T = any>(sql: string, args: SqlArgs = []): Promise<T | undefined> {
+  if (useTurso()) {
+    const client = await getTursoClient();
+    const res = await client.execute(sql, args);
+    return (res.rows?.[0] as T | undefined) ?? undefined;
+  }
+
+  const db = getDb();
+  return db.prepare(sql).get(...(args as any[])) as T | undefined;
+}
+
+export async function dbAll<T = any>(sql: string, args: SqlArgs = []): Promise<T[]> {
+  if (useTurso()) {
+    const client = await getTursoClient();
+    const res = await client.execute(sql, args);
+    return (res.rows as T[]) ?? [];
+  }
+
+  const db = getDb();
+  return db.prepare(sql).all(...(args as any[])) as T[];
+}
+
+export async function dbRun(
+  sql: string,
+  args: SqlArgs = [],
+): Promise<{ lastInsertRowid?: number; rowsAffected?: number }> {
+  if (useTurso()) {
+    const client = await getTursoClient();
+    const res = await client.execute(sql, args);
+    const lastInsertRowid = res.lastInsertRowid !== undefined ? Number(res.lastInsertRowid) : undefined;
+    return { lastInsertRowid, rowsAffected: res.rowsAffected };
+  }
+
+  const db = getDb();
+  const info = db.prepare(sql).run(...(args as any[]));
+  return { lastInsertRowid: Number(info.lastInsertRowid), rowsAffected: info.changes };
 }
 
 // --------------- Schema (conforme MCD/MLD) ---------------
@@ -244,12 +338,219 @@ function initSchema(db: Database.Database) {
 
   // --------------- Seeds ---------------
   seedDefaultAdmin(db);
+  seedBossTestUser(db);
   seedDefaultCategories(db);
   seedDefaultCouleurs(db);
   seedDefaultSections(db);
   seedDefaultZones(db);
   seedDefaultArticles(db);
   seedTestData(db);
+}
+
+async function initSchemaTurso(client: Client) {
+  const schemaSql = `
+    CREATE TABLE IF NOT EXISTS profiles (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      email         TEXT    NOT NULL UNIQUE,
+      password_hash TEXT    NOT NULL,
+      nom           TEXT    NOT NULL DEFAULT '',
+      prenom        TEXT    NOT NULL DEFAULT '',
+      telephone     TEXT    NOT NULL DEFAULT '',
+      role          TEXT    NOT NULL DEFAULT 'vendeur'
+                    CHECK (role IN ('admin', 'vendeur', 'vendeur_proprietaire', 'livreur')),
+      active        INTEGER NOT NULL DEFAULT 1,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS categories (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom                   TEXT    NOT NULL UNIQUE,
+      couleur_affichage     TEXT    NOT NULL DEFAULT '#8B7355',
+      icone                 TEXT,
+      shopify_collection_id TEXT,
+      created_at            TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS couleurs (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom_distinct TEXT    NOT NULL,
+      ref_couleur  TEXT,
+      hex_code     TEXT,
+      created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sections (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero            INTEGER NOT NULL UNIQUE CHECK (numero BETWEEN 1 AND 14),
+      label             TEXT    NOT NULL,
+      categorie_id      INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      x                 REAL    NOT NULL DEFAULT 0,
+      y                 REAL    NOT NULL DEFAULT 0,
+      largeur_cm        REAL    NOT NULL DEFAULT 100,
+      profondeur_cm     REAL    NOT NULL DEFAULT 50,
+      hauteur_cm        REAL    NOT NULL DEFAULT 200,
+      rotation_deg      REAL    NOT NULL DEFAULT 0,
+      couleur_affichage TEXT    NOT NULL DEFAULT '#8B7355',
+      created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS zones_fonctionnelles (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      label             TEXT    NOT NULL,
+      type_zone         TEXT    NOT NULL CHECK (type_zone IN ('office','checkout','entrance','storage','palettes')),
+      x                 REAL    NOT NULL DEFAULT 0,
+      y                 REAL    NOT NULL DEFAULT 0,
+      largeur_cm        REAL    NOT NULL DEFAULT 100,
+      profondeur_cm     REAL    NOT NULL DEFAULT 100,
+      couleur_affichage TEXT    NOT NULL DEFAULT '#E5E7EB',
+      icone             TEXT    DEFAULT '📦',
+      created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS etages (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      section_id   INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+      index_etage  INTEGER NOT NULL,
+      hauteur_cm   REAL    NOT NULL,
+      capacite     INTEGER NOT NULL DEFAULT 10,
+      created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (section_id, index_etage)
+    );
+
+    CREATE TABLE IF NOT EXISTS articles (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero_article     TEXT    NOT NULL UNIQUE,
+      description        TEXT    NOT NULL DEFAULT '',
+      marque             TEXT,
+      modele             TEXT,
+      categorie_id       INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      couleur_id         INTEGER REFERENCES couleurs(id) ON DELETE SET NULL,
+      ref_couleur        TEXT,
+      prix_achat         REAL    DEFAULT 0,
+      prix_vente         REAL    DEFAULT 0,
+      marge              REAL    GENERATED ALWAYS AS (prix_vente - prix_achat) STORED,
+      quantite           INTEGER NOT NULL DEFAULT 0,
+      photo_url          TEXT,
+      code_barres        TEXT,
+      taille             TEXT,
+      taille_canape      TEXT,
+      shopify_product_id TEXT,
+      created_at         TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS placements_produit (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id         INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      etage_id           INTEGER NOT NULL REFERENCES etages(id) ON DELETE CASCADE,
+      position_x         REAL    DEFAULT 0,
+      largeur_affichage  REAL    DEFAULT 1,
+      hauteur_affichage  REAL    DEFAULT 1,
+      ordre_tri          INTEGER DEFAULT 0,
+      created_at         TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS clients (
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom                  TEXT    NOT NULL,
+      prenom               TEXT,
+      email                TEXT,
+      telephone            TEXT,
+      adresse              TEXT,
+      shopify_customer_id  TEXT,
+      created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS commandes (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id         INTEGER NOT NULL REFERENCES clients(id),
+      numero_commande   TEXT    NOT NULL UNIQUE,
+      shopify_order_id  TEXT,
+      statut            TEXT    NOT NULL DEFAULT 'en_attente'
+                        CHECK (statut IN ('en_attente','en_preparation','expediee','livree','annulee')),
+      montant_total_ttc REAL    DEFAULT 0,
+      date_commande     TEXT    NOT NULL DEFAULT (datetime('now')),
+      created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS bons_livraison (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero_bl         TEXT    NOT NULL UNIQUE,
+      commande_id       INTEGER REFERENCES commandes(id),
+      vendeur_id        INTEGER REFERENCES profiles(id),
+      livreur_id        INTEGER REFERENCES profiles(id),
+      client_id         INTEGER REFERENCES clients(id),
+      statut            TEXT    NOT NULL DEFAULT 'cree'
+                        CHECK (statut IN ('cree','confirme','en_livraison','livre','signe')),
+      mode_livraison    TEXT    NOT NULL DEFAULT 'domicile'
+                        CHECK (mode_livraison IN ('domicile','retrait_magasin')),
+      montant_total_ttc REAL    DEFAULT 0,
+      pdf_url           TEXT,
+      date_creation     TEXT    NOT NULL DEFAULT (datetime('now')),
+      date_livraison    TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS lignes_bl (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      bl_id          INTEGER NOT NULL REFERENCES bons_livraison(id) ON DELETE CASCADE,
+      article_id     INTEGER REFERENCES articles(id),
+      designation    TEXT    NOT NULL,
+      quantite       INTEGER NOT NULL DEFAULT 1,
+      prix_unitaire  REAL    NOT NULL DEFAULT 0,
+      total_ligne    REAL    GENERATED ALWAYS AS (quantite * prix_unitaire) STORED
+    );
+
+    CREATE TABLE IF NOT EXISTS creneaux_livraison (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      livreur_id  INTEGER NOT NULL REFERENCES profiles(id),
+      date_creneau TEXT   NOT NULL,
+      heure_debut TEXT    NOT NULL,
+      heure_fin   TEXT    NOT NULL,
+      statut      TEXT    NOT NULL DEFAULT 'disponible'
+                  CHECK (statut IN ('disponible','reserve','termine')),
+      bl_id       INTEGER REFERENCES bons_livraison(id),
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS signatures_electroniques (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      bl_id            INTEGER NOT NULL UNIQUE REFERENCES bons_livraison(id),
+      token            TEXT    NOT NULL UNIQUE,
+      email_client     TEXT    NOT NULL,
+      statut           TEXT    NOT NULL DEFAULT 'en_attente'
+                       CHECK (statut IN ('en_attente','signe','expire')),
+      signature_data   TEXT,
+      date_emission    TEXT    NOT NULL DEFAULT (datetime('now')),
+      date_expiration  TEXT    NOT NULL,
+      date_signature   TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS orders_cache (
+      shopify_id         BIGINT  PRIMARY KEY,
+      order_name         TEXT    NOT NULL,
+      email              TEXT,
+      data_json          TEXT    NOT NULL,
+      financial_status   TEXT,
+      fulfillment_status TEXT,
+      total_price        REAL,
+      created_at         TEXT    NOT NULL,
+      cached_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_articles_categorie ON articles(categorie_id);
+    CREATE INDEX IF NOT EXISTS idx_etages_section ON etages(section_id);
+    CREATE INDEX IF NOT EXISTS idx_placements_etage ON placements_produit(etage_id);
+    CREATE INDEX IF NOT EXISTS idx_placements_article ON placements_produit(article_id);
+    CREATE INDEX IF NOT EXISTS idx_bl_statut ON bons_livraison(statut);
+    CREATE INDEX IF NOT EXISTS idx_bl_livreur ON bons_livraison(livreur_id);
+  `;
+
+  const statements = splitSqlStatements(schemaSql);
+  for (const st of statements) {
+    await client.execute(st);
+  }
+
+  await seedDefaultAdminTurso();
+  await seedBossTestUserTurso();
 }
 
 // --------------- Seed helpers ---------------
@@ -263,6 +564,41 @@ function seedDefaultAdmin(db: Database.Database) {
        VALUES (?, ?, ?, ?, ?)`
     ).run('admin@decoshop.com', hash, 'DecoShop', 'Admin', 'admin');
     console.log('[DB] Admin par défaut créé : admin@decoshop.com / admin');
+  }
+}
+
+async function seedDefaultAdminTurso() {
+  const exists = await dbGet<{ id: number }>('SELECT id FROM profiles WHERE email = ?', ['admin@decoshop.com']);
+  if (!exists) {
+    const hash = bcrypt.hashSync('admin', 10);
+    await dbRun(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, role)
+       VALUES (?, ?, ?, ?, ?)`,
+      ['admin@decoshop.com', hash, 'DecoShop', 'Admin', 'admin'],
+    );
+  }
+}
+
+function seedBossTestUser(db: Database.Database) {
+  const exists = db.prepare('SELECT id FROM profiles WHERE email = ?').get('microdidact@gmail.com');
+  if (!exists) {
+    const hash = bcrypt.hashSync('microdidact', 10);
+    db.prepare(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, role)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run('microdidact@gmail.com', hash, 'Microdidact', 'Boss', 'vendeur_proprietaire');
+  }
+}
+
+async function seedBossTestUserTurso() {
+  const exists = await dbGet<{ id: number }>('SELECT id FROM profiles WHERE email = ?', ['microdidact@gmail.com']);
+  if (!exists) {
+    const hash = bcrypt.hashSync('microdidact', 10);
+    await dbRun(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, role)
+       VALUES (?, ?, ?, ?, ?)`,
+      ['microdidact@gmail.com', hash, 'Microdidact', 'Boss', 'vendeur_proprietaire'],
+    );
   }
 }
 
@@ -673,6 +1009,22 @@ export function generateBlNumber(db: Database.Database): string {
   return `${prefix}-${seq}`;
 }
 
+export async function generateBlNumberAsync(): Promise<string> {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const prefix = `DECO-BL-${yy}${mm}${dd}`;
+
+  const row = await dbGet<{ c: number }>(
+    `SELECT COUNT(*) as c FROM bons_livraison WHERE numero_bl LIKE ?`,
+    [`${prefix}%`],
+  );
+
+  const seq = String((row?.c ?? 0) + 1).padStart(4, '0');
+  return `${prefix}-${seq}`;
+}
+
 // --------------- Orders cache helpers ---------------
 
 export function cacheOrders(db: Database.Database, orders: any[]) {
@@ -703,5 +1055,32 @@ export function getCachedOrders(db: Database.Database): any[] {
   const rows = db.prepare(
     'SELECT data_json FROM orders_cache ORDER BY created_at DESC'
   ).all() as { data_json: string }[];
+  return rows.map((r) => JSON.parse(r.data_json));
+}
+
+export async function cacheOrdersAsync(orders: any[]) {
+  for (const o of orders) {
+    await dbRun(
+      `INSERT OR REPLACE INTO orders_cache
+        (shopify_id, order_name, email, data_json, financial_status, fulfillment_status, total_price, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        o.id,
+        o.name,
+        o.email,
+        JSON.stringify(o),
+        o.financial_status,
+        o.fulfillment_status,
+        parseFloat(o.total_price),
+        o.created_at,
+      ],
+    );
+  }
+}
+
+export async function getCachedOrdersAsync(): Promise<any[]> {
+  const rows = await dbAll<{ data_json: string }>(
+    'SELECT data_json FROM orders_cache ORDER BY created_at DESC'
+  );
   return rows.map((r) => JSON.parse(r.data_json));
 }

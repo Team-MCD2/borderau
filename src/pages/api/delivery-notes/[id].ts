@@ -5,7 +5,7 @@
 // OPTIONS /api/delivery-notes/[id] — Preflight CORS
 // ============================================================
 import type { APIRoute } from 'astro';
-import { getDb } from '../../../lib/db';
+import { dbAll, dbGet, dbRun } from '../../../lib/db';
 import { authenticateRequest } from '../../../lib/auth';
 import {
   jsonOk,
@@ -16,9 +16,8 @@ import {
 
 export const OPTIONS: APIRoute = () => corsPreflightResponse();
 
-function getNote(id: number) {
-  const db = getDb();
-  const note = db.prepare(
+async function getNote(id: number) {
+  const note = await dbGet<Record<string, unknown>>(
     `SELECT bl.*,
             c.nom AS client_nom, c.prenom AS client_prenom,
             c.email AS client_email, c.telephone AS client_telephone, c.adresse AS client_adresse,
@@ -28,14 +27,12 @@ function getNote(id: number) {
      LEFT JOIN clients c ON c.id = bl.client_id
      LEFT JOIN profiles p_vendeur ON p_vendeur.id = bl.vendeur_id
      LEFT JOIN profiles p_livreur ON p_livreur.id = bl.livreur_id
-     WHERE bl.id = ?`
-  ).get(id) as Record<string, unknown> | undefined;
+     WHERE bl.id = ?`,
+    [id],
+  );
   if (!note) return null;
 
-  const items = db.prepare(
-    'SELECT * FROM lignes_bl WHERE bl_id = ?'
-  ).all(id);
-
+  const items = await dbAll('SELECT * FROM lignes_bl WHERE bl_id = ?', [id]);
   return { ...note, items };
 }
 
@@ -47,7 +44,7 @@ export const GET: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   if (!id || isNaN(id)) return jsonError('ID invalide', 400);
 
-  const note = getNote(id);
+  const note = await getNote(id);
   if (!note) return jsonError('Bon de livraison introuvable', 404);
 
   return jsonOk({ delivery_note: note });
@@ -72,8 +69,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   if (!id || isNaN(id)) return jsonError('ID invalide', 400);
 
-  const db = getDb();
-  const existing = db.prepare('SELECT * FROM bons_livraison WHERE id = ?').get(id);
+  const existing = await dbGet('SELECT * FROM bons_livraison WHERE id = ?', [id]);
   if (!existing) return jsonError('Bon de livraison introuvable', 404);
 
   const parsed = await safeJsonParse<UpdateBlBody>(request);
@@ -102,11 +98,12 @@ export const PUT: APIRoute = async ({ params, request }) => {
 
   values.push(id);
 
-  db.prepare(
-    `UPDATE bons_livraison SET ${fields.join(', ')} WHERE id = ?`
-  ).run(...values);
+  await dbRun(
+    `UPDATE bons_livraison SET ${fields.join(', ')} WHERE id = ?`,
+    values,
+  );
 
-  const note = getNote(id);
+  const note = await getNote(id);
   return jsonOk({ delivery_note: note });
 };
 
@@ -122,10 +119,9 @@ export const DELETE: APIRoute = async ({ params, request }) => {
   const id = Number(params.id);
   if (!id || isNaN(id)) return jsonError('ID invalide', 400);
 
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM bons_livraison WHERE id = ?').get(id);
+  const existing = await dbGet('SELECT id FROM bons_livraison WHERE id = ?', [id]);
   if (!existing) return jsonError('Bon de livraison introuvable', 404);
 
-  db.prepare('DELETE FROM bons_livraison WHERE id = ?').run(id);
+  await dbRun('DELETE FROM bons_livraison WHERE id = ?', [id]);
   return jsonOk({ deleted: true, id });
 };

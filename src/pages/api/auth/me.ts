@@ -14,7 +14,7 @@ export const GET: APIRoute = async ({ request }) => {
     return jsonError('Non authentifié', 401);
   }
 
-  const user = findUserById(payload.userId);
+  const user = await findUserById(payload.userId);
   if (!user) {
     return jsonError('Utilisateur introuvable', 404);
   }

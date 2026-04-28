@@ -4,7 +4,7 @@
 // OPTIONS /api/articles  — Preflight CORS
 // ============================================================
 import type { APIRoute } from 'astro';
-import { getDb } from '../../../lib/db';
+import { dbAll, dbGet, dbRun } from '../../../lib/db';
 import { authenticateRequest } from '../../../lib/auth';
 import {
   jsonOk,
@@ -24,8 +24,6 @@ export const GET: APIRoute = async ({ request, url }) => {
     return jsonError('Accès refusé', 403);
   }
 
-  const db = getDb();
-
   const categorieId = url.searchParams.get('categorie_id');
   const search = url.searchParams.get('search');
   const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200);
@@ -44,9 +42,10 @@ export const GET: APIRoute = async ({ request, url }) => {
     params.push(s, s, s, s);
   }
 
-  const countRow = db.prepare(
-    `SELECT COUNT(*) as total FROM articles a ${where}`
-  ).get(...params) as { total: number };
+  const countRow = await dbGet<{ total: number }>(
+    `SELECT COUNT(*) as total FROM articles a ${where}`,
+    params,
+  );
 
   // Hide prix_achat & marge for vendeur (non-propriétaire)
   const selectFields = auth.role === 'vendeur'
@@ -57,16 +56,16 @@ export const GET: APIRoute = async ({ request, url }) => {
     : `a.*, c.nom AS categorie_nom`;
 
   params.push(limit, offset);
-  const rows = db.prepare(
+  const rows = await dbAll(
     `SELECT ${selectFields}
      FROM articles a
      LEFT JOIN categories c ON c.id = a.categorie_id
      ${where}
      ORDER BY a.created_at DESC
      LIMIT ? OFFSET ?`
-  ).all(...params);
+  , params);
 
-  return jsonOk({ articles: rows, total: countRow.total, limit, offset });
+  return jsonOk({ articles: rows, total: countRow?.total ?? 0, limit, offset });
 };
 
 // --------------- POST /api/articles ---------------
@@ -103,8 +102,6 @@ export const POST: APIRoute = async ({ request }) => {
     return jsonError('description requise', 400);
   }
 
-  const db = getDb();
-
   // Generate numero_article: DECO-YYMMDD-XXXXXX
   const now = new Date();
   const yy = String(now.getFullYear()).slice(2);
@@ -113,13 +110,13 @@ export const POST: APIRoute = async ({ request }) => {
   const rand = String(Math.floor(Math.random() * 999999)).padStart(6, '0');
   const numeroArticle = `DECO-${yy}${mm}${dd}-${rand}`;
 
-  const result = db.prepare(`
+  const result = await dbRun(`
     INSERT INTO articles
       (numero_article, description, marque, modele, categorie_id,
        couleur_id, ref_couleur, prix_achat, prix_vente,
        code_barres, photo_url, quantite, taille, taille_canape)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `, [
     numeroArticle,
     body.description,
     body.marque ?? null,
@@ -134,8 +131,8 @@ export const POST: APIRoute = async ({ request }) => {
     body.quantite ?? 0,
     body.taille ?? null,
     body.taille_canape ?? null,
-  );
+  ]);
 
-  const article = db.prepare('SELECT * FROM articles WHERE id = ?').get(result.lastInsertRowid);
+  const article = await dbGet('SELECT * FROM articles WHERE id = ?', [result.lastInsertRowid]);
   return jsonOk({ article }, 201);
 };

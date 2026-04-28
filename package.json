@@ -12,6 +12,7 @@
   "dependencies": {
     "@astrojs/react": "^4.2.1",
     "@astrojs/tailwind": "^6.0.2",
+    "@libsql/client": "^0.15.12",
     "@shopify/shopify-api": "^11.10.1",
     "astro": "^5.7.10",
     "bcryptjs": "^3.0.3",

@@ -5,7 +5,7 @@
 import type { APIRoute } from 'astro';
 import { getOrders, isConfigured } from '../../lib/shopify';
 import { MOCK_ORDERS } from '../../lib/mock-data';
-import { getDb, cacheOrders, getCachedOrders } from '../../lib/db';
+import { dbAll, getCachedOrdersAsync, cacheOrdersAsync } from '../../lib/db';
 import {
   jsonOk,
   jsonError,
@@ -19,8 +19,7 @@ export const OPTIONS: APIRoute = () => corsPreflightResponse();
 export const GET: APIRoute = async ({ url }) => {
   // Mode SQLite si Shopify non configuré — retourne les BL comme des commandes
   if (!isConfigured()) {
-    const db = getDb();
-    const rows = db.prepare(
+    const rows = await dbAll<Record<string, any>>(
       `SELECT bl.*,
               c.nom AS client_nom, c.prenom AS client_prenom,
               c.email AS client_email, c.adresse AS client_adresse,
@@ -30,10 +29,6 @@ export const GET: APIRoute = async ({ url }) => {
        LEFT JOIN profiles p_vendeur ON p_vendeur.id = bl.vendeur_id
        ORDER BY bl.date_creation DESC
        LIMIT 50`
-    ).all() as Record<string, any>[];
-
-    const stmtItems = db.prepare(
-      'SELECT * FROM lignes_bl WHERE bl_id = ?'
     );
 
     // Formater les BL en format "order" pour le Dashboard
@@ -45,9 +40,10 @@ export const GET: APIRoute = async ({ url }) => {
       signe: 'fulfilled',
     };
 
-    const orders = rows.map((row) => {
-      const items = stmtItems.all(row.id) as Record<string, any>[];
-      return {
+    const orders = [] as any[];
+    for (const row of rows) {
+      const items = await dbAll<Record<string, any>>('SELECT * FROM lignes_bl WHERE bl_id = ?', [row.id]);
+      orders.push({
         id: row.id,
         name: row.numero_bl,
         email: row.client_email || '',
@@ -100,8 +96,8 @@ export const GET: APIRoute = async ({ url }) => {
         _bl_statut: row.statut,
         _bl_mode_livraison: row.mode_livraison,
         _bl_livreur_id: row.livreur_id,
-      };
-    });
+      });
+    }
 
     return jsonOk({
       orders,
@@ -124,8 +120,7 @@ export const GET: APIRoute = async ({ url }) => {
   if (error) {
     // Fallback to cached orders on Shopify failure
     try {
-      const db = getDb();
-      const cached = getCachedOrders(db);
+      const cached = await getCachedOrdersAsync();
       if (cached.length > 0) {
         return jsonOk({ orders: cached, cached: true, log });
       }
@@ -136,8 +131,7 @@ export const GET: APIRoute = async ({ url }) => {
   // Cache orders in SQLite for offline access
   const orders = data?.orders ?? [];
   try {
-    const db = getDb();
-    if (orders.length > 0) cacheOrders(db, orders);
+    if (orders.length > 0) await cacheOrdersAsync(orders);
   } catch { /* ignore cache errors */ }
 
   return jsonOk({ orders, log });
