@@ -551,6 +551,12 @@ async function initSchemaTurso(client: Client) {
 
   await seedDefaultAdminTurso();
   await seedBossTestUserTurso();
+  await seedDefaultCategoriesTurso();
+  await seedDefaultCouleursTurso();
+  await seedDefaultSectionsTurso();
+  await seedDefaultZonesTurso();
+  await seedDefaultArticlesTurso();
+  await seedTestDataTurso();
 }
 
 // --------------- Seed helpers ---------------
@@ -599,6 +605,239 @@ async function seedBossTestUserTurso() {
        VALUES (?, ?, ?, ?, ?)`,
       ['microdidact@gmail.com', hash, 'Microdidact', 'Boss', 'vendeur_proprietaire'],
     );
+  }
+}
+
+async function seedDefaultCategoriesTurso() {
+  const count = await dbGet<{ c: number }>('SELECT COUNT(*) as c FROM categories');
+  if (count && count.c > 0) return;
+
+  const cats: [string, string][] = [
+    ['Divers / Spirituel', '#D4AF37'],
+    ['Cuisine / Arts de la table', '#8B4513'],
+    ['Électroménager', '#7F8C8D'],
+    ['Textile maison', '#1E3A8A'],
+    ['Livres / Spirituel', '#4A4A4A'],
+    ['Ustensiles', '#CD853F'],
+    ['Céramique / Verre', '#C4A777'],
+    ['Thé & Service', '#B8860B'],
+    ['Verrerie / Service', '#DAA520'],
+    ['Collections marque', '#34495E'],
+    ['Voilages & Rideaux', '#2C3E50'],
+    ['Rideaux & Textile canapé', '#7F8C8D'],
+    ['Encens & Parfums', '#D35400'],
+    ['Mixte / Palettes', '#C0392B'],
+  ];
+
+  for (const c of cats) {
+    await dbRun('INSERT INTO categories (nom, couleur_affichage) VALUES (?, ?)', c);
+  }
+}
+
+async function seedDefaultCouleursTurso() {
+  const count = await dbGet<{ c: number }>('SELECT COUNT(*) as c FROM couleurs');
+  if (count && count.c > 0) return;
+
+  const couleurs: [string, string, string][] = [
+    ['Blanc', '001', '#FFFFFF'],
+    ['Noir', '002', '#000000'],
+    ['Beige', '003', '#F5F5DC'],
+    ['Gris', '004', '#808080'],
+    ['Bleu nuit', '020', '#1E3A8A'],
+    ['Bordeaux', '021', '#800020'],
+    ['Or', '030', '#FFD700'],
+    ['Argent', '031', '#C0C0C0'],
+    ['Rouge', '035', '#DC2626'],
+    ['Vert', '040', '#22C55E'],
+    ['Marron', '050', '#8B4513'],
+    ['Rose', '060', '#EC4899'],
+    ['Crème', '070', '#FFFDD0'],
+    ['Taupe', '080', '#483C32'],
+  ];
+
+  for (const c of couleurs) {
+    await dbRun('INSERT INTO couleurs (nom_distinct, ref_couleur, hex_code) VALUES (?, ?, ?)', c);
+  }
+}
+
+async function seedDefaultSectionsTurso() {
+  const count = await dbGet<{ c: number }>('SELECT COUNT(*) as c FROM sections');
+  if (count && count.c > 0) return;
+
+  const sections: [number, string, number, number, number, number, number, string][] = [
+    [1,  'Section 1',              2.5, 0.0, 150, 60, 200, '#D4AF37'],
+    [2,  'Section 2',              4.2, 0.0, 150, 60, 200, '#CD853F'],
+    [3,  'Section 3',              5.9, 0.0, 150, 60, 200, '#8B4513'],
+    [4,  'Section 4 (Comptoir)',   8.5, 1.5, 200, 80, 110, '#1E3A8A'],
+    [5,  'Section 5',              2.5, 2.5, 130, 50, 200, '#A0522D'],
+    [6,  'Section 6',              4.0, 2.5, 130, 50, 200, '#DAA520'],
+    [7,  'Section 7',              5.5, 2.5, 130, 50, 200, '#C4A777'],
+    [8,  'Section 8',              2.5, 3.8, 130, 50, 220, '#8B7355'],
+    [9,  'Section 9',              4.0, 3.8, 130, 50, 200, '#B8860B'],
+    [10, 'Section 10',             5.5, 3.8, 130, 50, 200, '#CD853F'],
+    [11, 'Section 11',             1.5, 6.0, 300, 80, 220, '#34495E'],
+    [12, 'Section 12',             7.0, 5.5, 200, 60, 200, '#7F8C8D'],
+    [13, 'Section 13',             6.5, 7.0, 100, 50, 200, '#D35400'],
+    [14, 'Section 14',             8.5, 7.0, 120, 50, 200, '#C0392B'],
+  ];
+
+  for (const s of sections) {
+    await dbRun(
+      'INSERT INTO sections (numero, label, x, y, largeur_cm, profondeur_cm, hauteur_cm, couleur_affichage) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      s
+    );
+  }
+}
+
+async function seedDefaultZonesTurso() {
+  const count = await dbGet<{ c: number }>('SELECT COUNT(*) as c FROM zones_fonctionnelles');
+  if (count && count.c > 0) return;
+
+  const zones: [string, string, number, number, number, number, string, string][] = [
+    ['Entrée',   'entrance', 0.0, 3.3, 150, 120, '#10B981', '🚪'],
+    ['Caisse',   'checkout', 0.5, 0.0, 150, 100, '#F59E0B', '💳'],
+    ['Bureau',   'office',   4.5, 6.5, 200, 150, '#6366F1', '🖥️'],
+    ['Stock',    'storage',  9.0, 4.5, 150, 200, '#EF4444', '📦'],
+    ['Palettes', 'palettes', 7.2, 6.8, 150, 100, '#9CA3AF', '🪵'],
+  ];
+
+  for (const z of zones) {
+    await dbRun(
+      'INSERT INTO zones_fonctionnelles (label, type_zone, x, y, largeur_cm, profondeur_cm, couleur_affichage, icone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      z
+    );
+  }
+}
+
+async function seedDefaultArticlesTurso() {
+  const count = await dbGet<{ c: number }>('SELECT COUNT(*) as c FROM articles');
+  if (count && count.c > 0) return;
+
+  const catalog: [string, number, string][] = [
+    // Section 1
+    ['Eau bénite', 1, 'Divers / Spirituel'],
+    ['Planche à dessin avec projection', 1, 'Divers / Spirituel'],
+    ['Lampe en forme de lune', 1, 'Divers / Spirituel'],
+    ['Mobile pour bébé', 1, 'Divers / Spirituel'],
+    ['Ourson', 1, 'Divers / Spirituel'],
+    ['Tapis de prière électronique', 1, 'Divers / Spirituel'],
+    ['Veilleuse', 1, 'Divers / Spirituel'],
+    ['Lessive', 1, 'Divers / Spirituel'],
+    ['Bouteilles en verre', 1, 'Céramique / Verre'],
+    ['Moule à pâtisserie', 1, 'Cuisine / Arts de la table'],
+    // Section 2
+    ['Brûleur d\'encens', 2, 'Encens & Parfums'],
+    ['Kit de casseroles', 2, 'Cuisine / Arts de la table'],
+    ['Pot à épices', 2, 'Cuisine / Arts de la table'],
+    ['Couteau', 2, 'Ustensiles'],
+    ['Plateau à thé', 2, 'Cuisine / Arts de la table'],
+    ['Plateau inox', 2, 'Cuisine / Arts de la table'],
+    ['Saladier inox', 2, 'Cuisine / Arts de la table'],
+    ['Plaque à induction', 2, 'Électroménager'],
+    ['Cocotte', 2, 'Cuisine / Arts de la table'],
+    ['Cocotte avec revêtement antiadhésif', 2, 'Cuisine / Arts de la table'],
+    ['Dessous argenté et doré (pâtisserie)', 2, 'Cuisine / Arts de la table'],
+    ['Power kitchen machine', 2, 'Électroménager'],
+    // Section 3
+    ['Mélangeur de lait', 3, 'Électroménager'],
+    ['Air fryer', 3, 'Électroménager'],
+    ['Lessive (lot)', 3, 'Divers / Spirituel'],
+    ['Marmite', 3, 'Cuisine / Arts de la table'],
+    ['Kit poêles et casseroles', 3, 'Cuisine / Arts de la table'],
+    ['Kit poêles', 3, 'Cuisine / Arts de la table'],
+    ['Sopalin', 3, 'Divers / Spirituel'],
+    ['Papier toilette', 3, 'Divers / Spirituel'],
+  ];
+
+  const catRows = await dbAll<{ id: number; nom: string }>('SELECT id, nom FROM categories');
+  const catMap = new Map(catRows.map((c) => [c.nom, c.id]));
+
+  let idx = 0;
+  for (const [desc, sectionNumero, catName] of catalog) {
+    idx++;
+    const num = String(idx).padStart(6, '0');
+    const articleNumber = `DECO-260427-${num}`;
+    const categoryId = catMap.get(catName) ?? null;
+    await dbRun(
+      'INSERT INTO articles (numero_article, description, categorie_id, quantite) VALUES (?, ?, ?, ?)',
+      [articleNumber, desc, categoryId, 1]
+    );
+  }
+}
+
+async function seedTestDataTurso() {
+  const blCount = await dbGet<{ c: number }>('SELECT COUNT(*) as c FROM bons_livraison');
+  if (blCount && blCount.c > 0) return;
+
+  const hash = bcrypt.hashSync('test123', 10);
+
+  const vendeurExists = await dbGet('SELECT id FROM profiles WHERE email = ?', ['vendeur@decoshop.com']);
+  if (!vendeurExists) {
+    await dbRun(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, telephone, role) VALUES (?, ?, ?, ?, ?, ?)`,
+      ['vendeur@decoshop.com', hash, 'Martin', 'Sophie', '06 12 34 56 78', 'vendeur']
+    );
+  }
+
+  const livreurExists = await dbGet('SELECT id FROM profiles WHERE email = ?', ['livreur@decoshop.com']);
+  if (!livreurExists) {
+    await dbRun(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, telephone, role) VALUES (?, ?, ?, ?, ?, ?)`,
+      ['livreur@decoshop.com', hash, 'Dupont', 'Lucas', '06 98 76 54 32', 'livreur']
+    );
+  }
+
+  const vendeur = await dbGet<{ id: number }>('SELECT id FROM profiles WHERE email = ?', ['vendeur@decoshop.com']);
+  const livreur = await dbGet<{ id: number }>('SELECT id FROM profiles WHERE email = ?', ['livreur@decoshop.com']);
+
+  const clientsData = [
+    ['Benali', 'Amina', 'amina.benali@gmail.com', '06 11 22 33 44', '12 rue des Carmes, 31000 Toulouse'],
+    ['Rodriguez', 'Carlos', 'carlos.rodriguez@hotmail.fr', '07 55 66 77 88', '45 avenue Jean Jaures, 31000 Toulouse'],
+    ['Lefevre', 'Marie', 'marie.lefevre@orange.fr', '06 33 44 55 66', '8 place du Capitole, 31000 Toulouse'],
+  ];
+
+  for (const c of clientsData) {
+    await dbRun(`INSERT INTO clients (nom, prenom, email, telephone, adresse) VALUES (?, ?, ?, ?, ?)`, c);
+  }
+
+  const articles = await dbAll<{ id: number; description: string; prix_vente: number }>('SELECT id, description, prix_vente FROM articles LIMIT 5');
+
+  if (articles.length === 0 || !vendeur || !livreur) return;
+
+  const bls = [
+    { clientIdx: 1, statut: 'cree', mode: 'domicile', livreurId: null, dateLivraison: null },
+    { clientIdx: 2, statut: 'en_livraison', mode: 'domicile', livreurId: livreur.id, dateLivraison: '2026-04-28' },
+  ];
+
+  for (let i = 0; i < bls.length; i++) {
+    const bl = bls[i];
+    const numeroBl = await generateBlNumberAsync();
+    const clientId = bl.clientIdx;
+
+    let totalTtc = 0;
+    const lignes = [];
+    for (const a of articles) {
+      const qty = 1;
+      const prix = 25.50;
+      totalTtc += qty * prix;
+      lignes.push({ articleId: a.id, desc: a.description, qty, prix });
+    }
+
+    const result = await dbRun(
+      `INSERT INTO bons_livraison (numero_bl, vendeur_id, livreur_id, client_id, statut, mode_livraison, montant_total_ttc, date_livraison)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [numeroBl, vendeur.id, bl.livreurId, clientId, bl.statut, bl.mode, Math.round(totalTtc * 100) / 100, bl.dateLivraison]
+    );
+
+    const blId = result.lastInsertRowid;
+    if (blId) {
+      for (const l of lignes) {
+        await dbRun(
+          `INSERT INTO lignes_bl (bl_id, article_id, designation, quantite, prix_unitaire) VALUES (?, ?, ?, ?, ?)`,
+          [blId, l.articleId, l.desc, l.qty, l.prix]
+        );
+      }
+    }
   }
 }
 
