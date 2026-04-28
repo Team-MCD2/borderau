@@ -206,7 +206,7 @@ export function createFulfillment(payload: CreateFulfillmentPayload) {
 /** Met à jour le tracking d'un fulfillment */
 export function updateTracking(fulfillmentId: number, payload: UpdateTrackingPayload) {
   return shopifyFetch<{ fulfillment: ShopifyFulfillment }>(
-    'PUT',
+    'POST',
     `/fulfillments/${fulfillmentId}/update_tracking.json`,
     {
       fulfillment: {

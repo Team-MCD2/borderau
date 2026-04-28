@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import type { ShopifyOrder, ShopifyFulfillment, ApiLogEntry } from '../lib/shopify';
 import { useToast } from './Toast';
 import { useTheme } from './ThemeProvider';
@@ -154,7 +156,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         o.fulfillments.map((f) => f.tracking_number || '').filter(Boolean).join(' / '),
       ]);
     });
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const delimiter = ';';
+    const csvBody = rows
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(delimiter))
+      .join('\r\n');
+    const csv = `sep=${delimiter}\r\n${csvBody}`;
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -163,6 +169,56 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     a.click();
     URL.revokeObjectURL(url);
     addToast('success', `${sortedOrders.length} commande(s) exportee(s) en CSV`);
+  };
+
+  // Export PDF
+  const handleExportPDF = () => {
+    if (sortedOrders.length === 0) {
+      addToast('warning', 'Aucune commande à exporter');
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const now = new Date();
+    const titleDate = now.toLocaleDateString('fr-FR');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(`Export commandes — ${titleDate}`, 14, 14);
+
+    const head = [['Commande', 'Client', 'Email', 'Date', 'Montant', 'Devise', 'Statut', 'Tracking']];
+    const body = sortedOrders.map((o) => ([
+      o.name,
+      o.customer ? `${o.customer.first_name} ${o.customer.last_name}` : '',
+      o.email || '',
+      new Date(o.created_at).toLocaleDateString('fr-FR'),
+      Number(o.total_price).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      o.currency || 'EUR',
+      o.fulfillment_status || 'unfulfilled',
+      o.fulfillments.map((f) => f.tracking_number || '').filter(Boolean).join(' / '),
+    ]));
+
+    autoTable(doc, {
+      startY: 20,
+      head,
+      body,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+      headStyles: { fillColor: [0, 51, 153], textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 55 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 22, halign: 'right' },
+        5: { cellWidth: 15 },
+        6: { cellWidth: 25 },
+        7: { cellWidth: 55 },
+      },
+    });
+
+    doc.save(`commandes-${now.toISOString().slice(0, 10)}.pdf`);
+    addToast('success', `${sortedOrders.length} commande(s) exportee(s) en PDF`);
   };
 
   // Filtrage
@@ -506,6 +562,17 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </svg>
           </button>
 
+          {/* Export PDF */}
+          <button
+            onClick={handleExportPDF}
+            className="rounded-lg border border-gray-300 dark:border-gray-600 p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Exporter PDF"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v12m0 0l-3-3m3 3l3-3M4 20h16" />
+            </svg>
+          </button>
+
           {/* Dark mode toggle */}
           <button
             onClick={toggleTheme}
@@ -551,11 +618,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       </div>
 
       {/* Raccourcis clavier hint */}
-      <div className="flex flex-wrap gap-3 text-[10px] text-gray-400 dark:text-gray-500">
-        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">/</kbd> Rechercher</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">R</kbd> Rafraîchir</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">Esc</kbd> Fermer</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">Ctrl+A</kbd> Tout sélectionner</span>
+      <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 dark:text-gray-500">
+        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-gray-700 dark:text-gray-300">/</kbd> Rechercher</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-gray-700 dark:text-gray-300">R</kbd> Rafraîchir</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-gray-700 dark:text-gray-300">Esc</kbd> Fermer</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono text-gray-700 dark:text-gray-300">Ctrl+A</kbd> Tout sélectionner</span>
       </div>
 
       {/* Erreur */}
@@ -721,7 +788,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                                   {f.tracking_number}
                                 </span>
                               ) : (
-                                <span className="text-xs text-gray-400 group-hover:text-blue-500">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-blue-500">
                                   Ajouter tracking
                                 </span>
                               )}
@@ -734,7 +801,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-xs text-gray-300">—</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
                       )}
                     </td>
 

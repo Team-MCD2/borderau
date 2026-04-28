@@ -45,11 +45,11 @@ export default function OrderDetailPanel({
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-lg bg-white shadow-2xl overflow-y-auto animate-slide-in-left">
+      <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 shadow-2xl overflow-y-auto animate-slide-in-left">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Commande {order.name}</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Commande {order.name}</h2>
             <div className="flex items-center gap-2 mt-1">
               <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(order.fulfillment_status)}`}>
                 {statusLabel(order.fulfillment_status)}
@@ -59,7 +59,7 @@ export default function OrderDetailPanel({
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -69,20 +69,20 @@ export default function OrderDetailPanel({
         <div className="p-6 space-y-6">
           {/* Client */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Client</h3>
-            <div className="rounded-xl border border-gray-200 p-4 space-y-2">
-              <p className="font-medium text-gray-900">
+            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Client</h3>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
+              <p className="font-medium text-gray-900 dark:text-gray-100">
                 {order.customer ? `${order.customer.first_name} ${order.customer.last_name}` : '—'}
               </p>
-              <p className="text-sm text-gray-500">{order.email}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{order.email}</p>
             </div>
           </section>
 
           {/* Adresse de livraison */}
           {order.shipping_address && (
             <section>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Adresse de livraison</h3>
-              <div className="rounded-xl border border-gray-200 p-4 text-sm text-gray-700 space-y-1">
+              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Adresse de livraison</h3>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-sm text-gray-700 dark:text-gray-300 space-y-1">
                 <p className="font-medium">{order.shipping_address.first_name} {order.shipping_address.last_name}</p>
                 <p>{order.shipping_address.address1}</p>
                 <p>{order.shipping_address.zip} {order.shipping_address.city}</p>
@@ -93,10 +93,10 @@ export default function OrderDetailPanel({
 
           {/* Montant */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Paiement</h3>
-            <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Paiement</h3>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {Number(order.total_price).toLocaleString('fr-FR', { style: 'currency', currency: order.currency || 'EUR' })}
                 </p>
                 <p className="text-xs text-gray-400 mt-1 capitalize">{order.financial_status}</p>
@@ -106,18 +106,18 @@ export default function OrderDetailPanel({
 
           {/* Articles */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
               Articles ({order.line_items.length})
             </h3>
-            <div className="rounded-xl border border-gray-200 divide-y">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
               {order.line_items.map((item) => (
                 <div key={item.id} className="p-4 flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5">SKU: {item.sku || '—'}</p>
                   </div>
                   <div className="text-right ml-4 shrink-0">
-                    <p className="text-sm font-medium text-gray-800">×{item.quantity}</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">×{item.quantity}</p>
                     <p className="text-xs text-gray-400">{item.price} €</p>
                   </div>
                   <div className="ml-3 shrink-0">
@@ -135,7 +135,7 @@ export default function OrderDetailPanel({
           {/* Bons de livraison (fulfillments) */}
           <section>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                 Bons de livraison ({order.fulfillments.length})
               </h3>
               {order.fulfillment_status !== 'fulfilled' && (
@@ -149,7 +149,7 @@ export default function OrderDetailPanel({
             </div>
 
             {order.fulfillments.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
+              <div className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-8 text-center">
                 <p className="text-sm text-gray-400">Aucun bon de livraison</p>
                 {order.fulfillment_status !== 'fulfilled' && (
                   <button
@@ -163,10 +163,10 @@ export default function OrderDetailPanel({
             ) : (
               <div className="space-y-3">
                 {order.fulfillments.map((f) => (
-                  <div key={f.id} className="rounded-xl border border-gray-200 p-4 space-y-3">
+                  <div key={f.id} className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Fulfillment #{f.id}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Fulfillment #{f.id}</p>
                         <p className={`text-xs font-medium ${fulfillmentStatusColor(f.status)}`}>
                           {f.status}
                         </p>
@@ -174,13 +174,13 @@ export default function OrderDetailPanel({
                       <div className="flex gap-2">
                         <button
                           onClick={() => onEditTracking(f)}
-                          className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                          className="rounded-lg bg-gray-100 dark:bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         >
                           Éditer
                         </button>
                         <button
                           onClick={() => onPrintDeliveryNote(order, f)}
-                          className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                          className="rounded-lg bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
                         >
                           Imprimer
                         </button>
@@ -189,14 +189,14 @@ export default function OrderDetailPanel({
 
                     {/* Tracking info */}
                     {f.tracking_number && (
-                      <div className="rounded-lg bg-gray-50 p-3 text-sm">
+                      <div className="rounded-lg bg-gray-100 dark:bg-gray-700/50 p-3 text-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-500">N° suivi:</span>
+                          <span className="text-gray-600 dark:text-gray-400">N° suivi:</span>
                           <span className="font-mono text-blue-600">{f.tracking_number}</span>
                         </div>
                         {f.tracking_company && (
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-gray-500">Transporteur:</span>
+                            <span className="text-gray-600 dark:text-gray-400">Transporteur:</span>
                             <span className="font-medium">{f.tracking_company}</span>
                           </div>
                         )}
@@ -233,10 +233,10 @@ export default function OrderDetailPanel({
           </section>
 
           {/* Actions globales */}
-          <section className="border-t pt-4">
+          <section className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <button
               onClick={() => onPrintDeliveryNote(order)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />

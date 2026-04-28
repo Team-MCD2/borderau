@@ -249,6 +249,7 @@ function initSchema(db: Database.Database) {
   seedDefaultSections(db);
   seedDefaultZones(db);
   seedDefaultArticles(db);
+  seedTestData(db);
 }
 
 // --------------- Seed helpers ---------------
@@ -545,6 +546,114 @@ function seedDefaultArticles(db: Database.Database) {
   });
   tx();
   console.log(`[DB] ${catalog.length} articles du catalogue DecoShop insérés`);
+}
+
+// --------------- Seed test data ---------------
+
+function seedTestData(db: Database.Database) {
+  const blCount = (db.prepare('SELECT COUNT(*) as c FROM bons_livraison').get() as any).c;
+  if (blCount > 0) return;
+
+  // --- Profils vendeur & livreur ---
+  const hash = bcrypt.hashSync('test123', 10);
+
+  const vendeurExists = db.prepare('SELECT id FROM profiles WHERE email = ?').get('vendeur@decoshop.com');
+  if (!vendeurExists) {
+    db.prepare(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, telephone, role)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('vendeur@decoshop.com', hash, 'Martin', 'Sophie', '06 12 34 56 78', 'vendeur');
+  }
+
+  const livreurExists = db.prepare('SELECT id FROM profiles WHERE email = ?').get('livreur@decoshop.com');
+  if (!livreurExists) {
+    db.prepare(
+      `INSERT INTO profiles (email, password_hash, nom, prenom, telephone, role)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('livreur@decoshop.com', hash, 'Dupont', 'Lucas', '06 98 76 54 32', 'livreur');
+  }
+
+  const vendeur = db.prepare('SELECT id FROM profiles WHERE email = ?').get('vendeur@decoshop.com') as { id: number };
+  const livreur = db.prepare('SELECT id FROM profiles WHERE email = ?').get('livreur@decoshop.com') as { id: number };
+
+  // --- Clients test ---
+  const clientsData: [string, string, string, string, string][] = [
+    ['Benali', 'Amina', 'amina.benali@gmail.com', '06 11 22 33 44', '12 rue des Carmes, 31000 Toulouse'],
+    ['Rodriguez', 'Carlos', 'carlos.rodriguez@hotmail.fr', '07 55 66 77 88', '45 avenue Jean Jaures, 31000 Toulouse'],
+    ['Lefevre', 'Marie', 'marie.lefevre@orange.fr', '06 33 44 55 66', '8 place du Capitole, 31000 Toulouse'],
+    ['Nguyen', 'Thomas', 'thomas.nguyen@free.fr', '07 11 99 88 77', '23 rue Alsace-Lorraine, 31000 Toulouse'],
+    ['Moreau', 'Julie', 'julie.moreau@gmail.com', '06 22 11 44 55', '67 boulevard Carnot, 31000 Toulouse'],
+  ];
+
+  const stmtClient = db.prepare(
+    `INSERT INTO clients (nom, prenom, email, telephone, adresse) VALUES (?, ?, ?, ?, ?)`
+  );
+  const tx1 = db.transaction(() => {
+    for (const c of clientsData) stmtClient.run(...c);
+  });
+  tx1();
+
+  // --- Récupérer quelques articles pour les lignes ---
+  const articles = db.prepare('SELECT id, description, prix_vente FROM articles LIMIT 20').all() as { id: number; description: string; prix_vente: number }[];
+
+  // --- Bons de livraison test ---
+  const bls: { clientIdx: number; statut: string; mode: string; livreurId: number | null; dateLivraison: string | null; items: number[] }[] = [
+    { clientIdx: 1, statut: 'cree',          mode: 'domicile',         livreurId: null,       dateLivraison: null,         items: [0, 1, 2] },
+    { clientIdx: 2, statut: 'confirme',       mode: 'domicile',         livreurId: livreur.id, dateLivraison: null,         items: [3, 4] },
+    { clientIdx: 3, statut: 'en_livraison',   mode: 'domicile',         livreurId: livreur.id, dateLivraison: '2026-04-28', items: [5, 6, 7] },
+    { clientIdx: 1, statut: 'livre',          mode: 'domicile',         livreurId: livreur.id, dateLivraison: '2026-04-25', items: [8, 9] },
+    { clientIdx: 4, statut: 'signe',          mode: 'retrait_magasin',  livreurId: null,       dateLivraison: '2026-04-24', items: [10, 11, 12] },
+    { clientIdx: 5, statut: 'cree',           mode: 'retrait_magasin',  livreurId: null,       dateLivraison: null,         items: [13, 14] },
+    { clientIdx: 2, statut: 'en_livraison',   mode: 'domicile',         livreurId: livreur.id, dateLivraison: '2026-04-28', items: [15, 16, 17] },
+    { clientIdx: 3, statut: 'livre',          mode: 'domicile',         livreurId: livreur.id, dateLivraison: '2026-04-26', items: [18, 19] },
+  ];
+
+  const stmtBl = db.prepare(
+    `INSERT INTO bons_livraison (numero_bl, vendeur_id, livreur_id, client_id, statut, mode_livraison, montant_total_ttc, date_livraison)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const stmtLigne = db.prepare(
+    `INSERT INTO lignes_bl (bl_id, article_id, designation, quantite, prix_unitaire)
+     VALUES (?, ?, ?, ?, ?)`
+  );
+
+  const tx2 = db.transaction(() => {
+    for (let i = 0; i < bls.length; i++) {
+      const bl = bls[i];
+      const numeroBl = generateBlNumber(db);
+      const clientId = bl.clientIdx; // clientIdx matches insert order (1-based)
+
+      let totalTtc = 0;
+      const lignes: { articleId: number; desc: string; qty: number; prix: number }[] = [];
+      for (const artIdx of bl.items) {
+        if (artIdx < articles.length) {
+          const a = articles[artIdx];
+          const qty = Math.floor(Math.random() * 3) + 1;
+          const prix = a.prix_vente > 0 ? a.prix_vente : Math.floor(Math.random() * 80) + 10;
+          totalTtc += qty * prix;
+          lignes.push({ articleId: a.id, desc: a.description, qty, prix });
+        }
+      }
+
+      const result = stmtBl.run(
+        numeroBl,
+        vendeur.id,
+        bl.livreurId,
+        clientId,
+        bl.statut,
+        bl.mode,
+        Math.round(totalTtc * 100) / 100,
+        bl.dateLivraison
+      );
+
+      const blId = result.lastInsertRowid;
+      for (const l of lignes) {
+        stmtLigne.run(blId, l.articleId, l.desc, l.qty, l.prix);
+      }
+    }
+  });
+  tx2();
+  console.log(`[DB] ${bls.length} bons de livraison test inseres (+ ${clientsData.length} clients, 2 profils)`);
 }
 
 // --------------- BL Number Generator ---------------
