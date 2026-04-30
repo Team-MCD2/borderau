@@ -15,6 +15,7 @@ import AdminDeliveryNotes from './AdminDeliveryNotes';
 import AdminInventory from './AdminInventory';
 import AdminClients from './AdminClients';
 import AdminUsers from './AdminUsers';
+import DriverDashboard from './DriverDashboard';
 
 type AutoRefresh = 0 | 30 | 60 | 300;
 
@@ -502,6 +503,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     addToast('info', `${selectedOrders.length} bon(s) envoyé(s) à l'impression`);
   };
+
+  // Si l'utilisateur est un livreur, afficher l'interface simplifiée
+  if (userRole === 'livreur') {
+    return <DriverDashboard />;
+  }
 
   return (
     <div className="space-y-6">
