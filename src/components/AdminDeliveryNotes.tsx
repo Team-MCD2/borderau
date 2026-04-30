@@ -62,6 +62,7 @@ export default function AdminDeliveryNotes() {
   const [status, setStatus] = useState<'all' | DeliveryNoteStatus>('all');
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [createOpen, setCreateOpen] = useState(false);
 
   const livreurs = useMemo(() => users.filter((u) => u.role === 'livreur'), [users]);
 
@@ -255,6 +256,26 @@ export default function AdminDeliveryNotes() {
       .finally(() => setSaving(false));
   };
 
+  const createBl = async (body: any) => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/delivery-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur création BL');
+      addToast('success', `BL ${data.delivery_note?.numero_bl || ''} créé !`);
+      setCreateOpen(false);
+      await fetchNotes();
+    } catch (e: any) {
+      addToast('error', e?.message || 'Erreur création BL');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
       <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
@@ -292,6 +313,12 @@ export default function AdminDeliveryNotes() {
             className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white"
           >
             Export CSV
+          </button>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
+          >
+            + Créer un BL
           </button>
         </div>
       </div>
@@ -421,6 +448,164 @@ export default function AdminDeliveryNotes() {
           </tbody>
         </table>
       </div>
+
+      {createOpen && (
+        <CreateBlModal
+          livreurs={livreurs}
+          saving={saving}
+          onClose={() => setCreateOpen(false)}
+          onSave={createBl}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Create BL Modal ───
+function CreateBlModal({
+  livreurs,
+  saving,
+  onClose,
+  onSave,
+}: {
+  livreurs: UserRow[];
+  saving: boolean;
+  onClose: () => void;
+  onSave: (body: any) => void;
+}) {
+  const [clientNom, setClientNom] = useState('');
+  const [clientPrenom, setClientPrenom] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientTelephone, setClientTelephone] = useState('');
+  const [clientAdresse, setClientAdresse] = useState('');
+  const [modeLivraison, setModeLivraison] = useState<'domicile' | 'retrait_magasin'>('domicile');
+  const [livreurId, setLivreurId] = useState('');
+  const [items, setItems] = useState([{ designation: '', quantite: 1, prix_unitaire: 0 }]);
+
+  const addItem = () => setItems([...items, { designation: '', quantite: 1, prix_unitaire: 0 }]);
+  const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const updateItem = (idx: number, field: string, value: any) => {
+    setItems(items.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
+  };
+
+  const total = items.reduce((s, it) => s + it.quantite * it.prix_unitaire, 0);
+
+  const handleSubmit = () => {
+    const validItems = items.filter((it) => it.designation.trim());
+    if (!clientNom.trim()) return;
+    if (validItems.length === 0) return;
+    onSave({
+      client_nom: clientNom.trim(),
+      client_prenom: clientPrenom.trim(),
+      client_email: clientEmail.trim(),
+      client_telephone: clientTelephone.trim(),
+      client_adresse: clientAdresse.trim(),
+      mode_livraison: modeLivraison,
+      livreur_id: livreurId ? Number(livreurId) : undefined,
+      items: validItems,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Créer un Bon de Livraison</h3>
+          <button onClick={onClose} className="px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100">Fermer</button>
+        </div>
+
+        <div className="p-4 overflow-y-auto flex-1 space-y-4">
+          {/* Client info */}
+          <div>
+            <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold mb-2">Informations client</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400">Nom *</label>
+                <input value={clientNom} onChange={(e) => setClientNom(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400">Prénom</label>
+                <input value={clientPrenom} onChange={(e) => setClientPrenom(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400">Téléphone</label>
+                <input value={clientTelephone} onChange={(e) => setClientTelephone(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400">Email</label>
+                <input value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} type="email" className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-gray-500 dark:text-gray-400">Adresse de livraison</label>
+                <input value={clientAdresse} onChange={(e) => setClientAdresse(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" placeholder="12 rue des Carmes, 31000 Toulouse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400">Mode de livraison</label>
+              <select value={modeLivraison} onChange={(e) => setModeLivraison(e.target.value as any)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+                <option value="domicile">À domicile</option>
+                <option value="retrait_magasin">Retrait magasin</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400">Assigner un livreur</label>
+              <select value={livreurId} onChange={(e) => setLivreurId(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+                <option value="">Non assigné</option>
+                {livreurs.map((u) => <option key={u.id} value={String(u.id)}>{u.prenom} {u.nom}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Articles */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">Articles</p>
+              <button onClick={addItem} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">+ Ajouter</button>
+            </div>
+            <div className="space-y-2">
+              {items.map((it, idx) => (
+                <div key={idx} className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    {idx === 0 && <label className="block text-xs text-gray-500 dark:text-gray-400">Désignation *</label>}
+                    <input value={it.designation} onChange={(e) => updateItem(idx, 'designation', e.target.value)} placeholder="Ex: Cocotte en fonte" className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+                  </div>
+                  <div className="w-16">
+                    {idx === 0 && <label className="block text-xs text-gray-500 dark:text-gray-400">Qté</label>}
+                    <input type="number" min={1} value={it.quantite} onChange={(e) => updateItem(idx, 'quantite', Number(e.target.value))} className="w-full px-2 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+                  </div>
+                  <div className="w-24">
+                    {idx === 0 && <label className="block text-xs text-gray-500 dark:text-gray-400">Prix €</label>}
+                    <input type="number" min={0} step={0.01} value={it.prix_unitaire} onChange={(e) => updateItem(idx, 'prix_unitaire', Number(e.target.value))} className="w-full px-2 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+                  </div>
+                  {items.length > 1 && (
+                    <button onClick={() => removeItem(idx)} className="px-2 py-2 text-red-500 hover:text-red-700">✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Total : {total.toFixed(2)} €
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100">Annuler</button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || !clientNom.trim() || items.every((it) => !it.designation.trim())}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50"
+          >
+            {saving ? 'Création...' : 'Créer le BL'}
+          </button>
+        </div>
+      </div>
+
+      {/* Quick article search could go here in a future version */}
     </div>
   );
 }

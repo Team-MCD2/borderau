@@ -506,7 +506,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   // Si l'utilisateur est un livreur, afficher l'interface simplifiée
   if (userRole === 'livreur') {
-    return <DriverDashboard />;
+    return <DriverDashboard onLogout={onLogout} />;
   }
 
   return (
@@ -528,7 +528,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       <Analytics orders={orders} />
 
       {/* Admin tabs */}
-      {(userRole === 'admin' || userRole === 'vendeur_proprietaire') && (
+      {(userRole === 'admin' || userRole === 'vendeur_proprietaire' || userRole === 'vendeur') && (
         <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 pb-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
           <button
             onClick={() => setAdminView('orders')}
@@ -570,6 +570,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           >
             Clients
           </button>
+          {(userRole === 'admin' || userRole === 'vendeur_proprietaire') && (
           <button
             onClick={() => setAdminView('users')}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
@@ -580,6 +581,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           >
             Utilisateurs
           </button>
+          )}
         </div>
       )}
 
